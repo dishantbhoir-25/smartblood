@@ -1,4 +1,5 @@
 .env
+ngrok*
 venv/
 .venv/
 __pycache__/

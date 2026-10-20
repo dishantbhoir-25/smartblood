@@ -8,7 +8,42 @@ A beginner-friendly Flask prototype for coordinating urgent blood requests with 
 - Add hospital records and update blood inventory
 - Demo alert history (does not place calls by default)
 - Optional Twilio voice-call integration for verified hospitals
-- SQLite database created automatically
+- SQLite locally; **Neon Postgres** on Vercel (via Marketplace integration)
+
+## Deploy on Vercel (single project + Neon)
+
+The app is one Flask service: `app.py` serves HTML (`templates/`), static assets (`static/`), and API routes. Vercel detects the root `app` instance in `app.py` automatically.
+
+### Repo layout (deployment-relevant)
+
+```text
+smartblood/
+├── app.py              # Flask entry (Vercel Python function)
+├── vercel.json         # function limits (maxDuration)
+├── requirements.txt    # includes psycopg for Neon
+├── templates/          # server-rendered UI
+├── static/             # CSS/JS
+└── .python-version     # 3.12 (matches Vercel default)
+```
+
+### One-time setup
+
+1. Push this repo to GitHub (or GitLab/Bitbucket) and **Import** it at [vercel.com/new](https://vercel.com/new), or from the project root run `vercel link` then `vercel`.
+2. Add **Neon** from the [Vercel Marketplace](https://vercel.com/marketplace) (or `vercel install neon`) and connect it to this project. Vercel injects **`DATABASE_URL`** (pooled; use this in production) and **`DATABASE_URL_UNPOOLED`** (direct; optional, for CLI tools).
+3. In Vercel → **Settings → Environment Variables**, set at least:
+   - `SECRET_KEY` — long random string
+   - `ADMIN_VERIFY_KEY` — if you use hospital verification
+   - Twilio vars — only if enabling real calls
+   - `PUBLIC_BASE_URL` — optional; defaults to `https://<VERCEL_URL>`
+4. Deploy (`vercel --prod` or push to your production branch).
+
+On first request after deploy, the app runs `db.create_all()` and seeds demo hospitals if the database is empty. Preview deployments can get their own Neon branch when preview branching is enabled on the integration.
+
+### Local dev with Neon (optional)
+
+Copy `.env.example` to `.env`, paste your **pooled** Neon connection string as `DATABASE_URL`, then `pip install -r requirements.txt` and `python app.py`. Without `DATABASE_URL`, SQLite is used under `instance/smart_bloodlink.db`.
+
+Pull Vercel env vars: `vercel link` then `vercel env pull .env.local` (merge into `.env` as needed).
 
 ## Run locally
 1. Install Python 3.10 or newer.
@@ -38,7 +73,7 @@ A beginner-friendly Flask prototype for coordinating urgent blood requests with 
    ```
 7. Open http://127.0.0.1:5000 in your browser.
 
-The first run creates `smart_bloodlink.db` and adds sample hospitals and sample inventory. The sample data is fictional; replace it with verified information.
+The first run creates the database (SQLite file or Neon schema) and adds sample hospitals and sample inventory. The sample data is fictional; replace it with verified information.
 
 ## Optional Twilio calling
 Real calls require a Twilio account, approved/authorized recipient numbers, account credentials, a public HTTPS URL, and compliance with applicable calling/privacy rules. Put credentials only in `.env`; never publish them. Set all four Twilio settings in `.env`. Only hospital records marked verified are eligible for real calls. In this starter, a call plays a scripted announcement; it is not a full conversational AI agent and it does not automatically confirm blood availability.
@@ -59,7 +94,7 @@ The project already includes the Twilio call route and the `twilio` package. Rea
 
 1. In this folder, copy `.env.example` to a file named `.env`.
 2. Put your real Twilio Account SID, Auth Token, and Twilio voice-capable phone number into `.env`. Do not share the `.env` file or commit it to GitHub.
-3. For `PUBLIC_BASE_URL`, use your deployed HTTPS address, or a temporary HTTPS tunnel to your local Flask server. A URL such as `http://127.0.0.1:5000` is not publicly reachable by Twilio.
+3. For `PUBLIC_BASE_URL`, use your Vercel deployment URL (for example `https://your-app.vercel.app`). On Vercel you can leave it empty and the app will use `VERCEL_URL`. A URL such as `http://127.0.0.1:5000` is not publicly reachable by Twilio.
 4. Restart Flask after changing `.env`.
 5. First test with a phone number you own and are authorized to call. Trial accounts may require that recipient number to be verified.
 6. Only mark a real hospital as verified after confirming its identity and phone number. The included sample hospitals are fictional and are deliberately unverified.

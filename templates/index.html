@@ -35,7 +35,7 @@
     <header class="topbar">
       <div class="mobile-brand">✚ SmartBloodLink</div>
       <div class="breadcrumb">Workspace <span>/</span> <strong>Overview</strong></div>
-      <div class="top-actions"><span class="status-dot"></span><span class="system-status">Network demo mode</span><button class="icon-button" title="Notifications">♧<i></i></button><div class="avatar small">SB</div></div>
+      <div class="top-actions"><span class="status-dot"></span><span class="system-status">{% if trial_script_mode %}Twilio trial — blood-request voice script{% elif trial_voice_mode %}Twilio trial — Console demo template{% elif real_calls_enabled %}Twilio ready — full voice with keypad{% else %}Demo mode — no live calls{% endif %}</span><button class="icon-button" title="Notifications">♧<i></i></button><div class="avatar small">SB</div></div>
     </header>
 
     <section class="page-heading" id="overview">
@@ -67,7 +67,7 @@
           <label>Units needed<input name="units" type="number" min="1" max="20" value="2" required></label>
           <label>City / area<input name="city" value="Mumbai" required></label>
           <label>Urgency<select name="urgency"><option>Critical</option><option selected>Urgent</option><option>Routine</option></select></label>
-          <label class="full">Contact phone<input name="contact_phone" type="tel" required placeholder="+91 98765 43210"></label>
+          <label class="full">Contact phone<input name="contact_phone" type="tel" required placeholder="9876543210 (+91 added automatically)"></label>
           <button class="button button-primary full" type="submit">Create request <span>→</span></button>
         </form>
         <div class="privacy-note"><span>ⓘ</span> Share only the minimum patient information needed for coordination.</div>
@@ -90,12 +90,23 @@
       <div class="table-heading"><div><div class="panel-kicker">LIVE WORK QUEUE</div><h2>Recent blood requests</h2></div><span class="pill neutral">{{ requests|length }} recent</span></div>
       <div class="table-scroll"><table><thead><tr><th>REQUEST</th><th>BLOOD GROUP</th><th>LOCATION</th><th>UNITS</th><th>URGENCY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>
       {% for item in requests %}
-        <tr><td><div class="request-person"><div class="person-icon">{{ item.patient_name[:1]|upper }}</div><div><strong>#BL-{{ "%04d"|format(item.id) }}</strong><small>{{ item.patient_name }}</small></div></div></td><td><span class="blood-badge">{{ item.blood_group }}</span></td><td>{{ item.city }}</td><td>{{ item.units }} units</td><td><span class="urgency {{ item.urgency|lower }}">{{ item.urgency }}</span></td><td><span class="status-pill {{ 'open' if item.status == 'Open' else 'closed' }}"><i></i>{{ item.status }}</span></td><td><form action="{{ url_for('alert_hospitals', request_id=item.id) }}" method="POST" onsubmit="return confirm('Start the hospital alert process? In demo mode, no calls are placed.');"><button class="table-action" type="submit">Alert hospitals ↗</button></form></td></tr>
+        <tr><td><div class="request-person"><div class="person-icon">{{ item.patient_name[:1]|upper }}</div><div><strong>#BL-{{ "%04d"|format(item.id) }}</strong><small>{{ item.patient_name }}</small></div></div></td><td><span class="blood-badge">{{ item.blood_group }}</span></td><td>{{ item.city }}</td><td>{{ item.units }} units</td><td><span class="urgency {{ item.urgency|lower }}">{{ item.urgency }}</span></td><td><span class="status-pill {{ 'open' if item.status == 'Open' else 'closed' }}"><i></i>{{ item.status }}</span></td><td><form class="alert-hospital-form" action="{{ url_for('alert_hospitals', request_id=item.id) }}" method="POST" onsubmit="return confirm('{% if real_calls_enabled %}Place one Twilio call to the selected hospital?{% else %}Log a demo alert for the selected hospital?{% endif %}');"><select name="hospital_id" required aria-label="Hospital to alert for request {{ item.id }}">{% for h in hospitals %}<option value="{{ h.id }}">{{ h.name }} · {{ h.city }}{% if real_calls_enabled %}{% if h.verified %} (verified){% else %} (not verified){% endif %}{% endif %}</option>{% endfor %}</select><button class="table-action" type="submit">Alert hospital ↗</button></form></td></tr>
       {% else %}
         <tr><td colspan="7" class="empty-table">No requests yet. Create the first request above.</td></tr>
       {% endfor %}
       </tbody></table></div>
       <div class="table-footer"><span>Showing recent requests</span><span class="footer-note"><i></i> Data stored locally in this demo</span></div>
+    </section>
+
+    <section class="panel table-panel" id="alerts">
+      <div class="table-heading"><div><div class="panel-kicker">COORDINATION LOG</div><h2>Alert history</h2></div><span class="pill neutral">{{ alert_logs|length }} recent</span></div>
+      <div class="table-scroll"><table><thead><tr><th>REQUEST</th><th>HOSPITAL</th><th>RESULT</th><th>DETAILS</th><th>TIME</th></tr></thead><tbody>
+      {% for log in alert_logs %}
+        <tr><td>#BL-{{ "%04d"|format(log.request_id) }}</td><td>{{ log.hospital_name }}</td><td><span class="urgency {% if log.result == 'Available' %}routine{% elif log.result in ['Call failed', 'Not available'] %}critical{% else %}urgent{% endif %}">{{ log.result }}</span></td><td>{{ log.details }}</td><td>{{ log.created_at.strftime('%d %b, %H:%M') }}</td></tr>
+      {% else %}
+        <tr><td colspan="5" class="empty-table">No alerts yet. Create a request and alert a hospital.</td></tr>
+      {% endfor %}
+      </tbody></table></div>
     </section>
 
     <section class="bottom-grid">
@@ -151,7 +162,7 @@
   </div>
 {% endfor %}
         </div>
-        <details class="inline-details"><summary>＋ Add a hospital</summary><form action="{{ url_for('add_hospital') }}" method="POST" class="compact-form"><input name="name" placeholder="Hospital name" required><input name="city" placeholder="City" required><input name="phone" placeholder="Phone number" required><input name="email" type="email" placeholder="Email (optional)"><button class="button button-primary" type="submit">Add hospital</button></form></details>
+        <details class="inline-details"><summary>＋ Add a hospital</summary><form action="{{ url_for('add_hospital') }}" method="POST" class="compact-form"><input name="name" placeholder="Hospital name" required><input name="city" placeholder="City" required><input name="phone" type="tel" placeholder="9876543210 (+91 added automatically)" required><input name="email" type="email" placeholder="Email (optional)"><button class="button button-primary" type="submit">Add hospital</button></form></details>
       </article>
 
       <article class="panel" id="inventory">
